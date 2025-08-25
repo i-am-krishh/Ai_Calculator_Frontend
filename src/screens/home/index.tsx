@@ -241,6 +241,22 @@ export default function Home() {
                     </div>
                 </Draggable>
             ))}
+
+
+            {/* Footer */}
+            <div
+                style={{
+                    position: 'absolute',
+                    bottom: '10px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    zIndex: 20, // Make sure it's above the canvas and other elements
+                    color: 'white',
+                    fontSize: '14px',
+                }}
+            >
+                Made by 💖 Krish
+            </div>
         </>
     );
 }

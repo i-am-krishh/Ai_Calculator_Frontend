@@ -5,6 +5,7 @@ import { MantineProvider } from "@mantine/core";
 import Home  from "./screens/home";
 
 import './index.css'
+import Footer from "./components/Footer";
 
 const paths = [
   {
@@ -21,6 +22,7 @@ const App = () => {
   return (
     <MantineProvider>
       <RouterProvider router={BrowserRouter} />
+      <Footer />
     </MantineProvider>
   )
 }
