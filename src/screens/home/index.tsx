@@ -5,6 +5,13 @@ import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import Draggable from 'react-draggable';
 import { SWATCHES } from '@/constants';
+import toast from 'react-hot-toast';
+
+declare global {
+    interface Window {
+        MathJax: any;
+    }
+}
 
 interface GeneratedResult {
     expression: string;
@@ -26,7 +33,8 @@ export default function Home() {
     const [result, setResult] = useState<GeneratedResult>();
     const [latexPosition, setLatexPosition] = useState({ x: 10, y: 200 });
     const [latexExpression, setLatexExpression] = useState<Array<string>>([]);
-    const latexRefs = useRef<Array<React.RefObject<HTMLDivElement | null>>>([]); // ✅ ref array
+    const latexRefs = useRef<Array<React.RefObject<HTMLDivElement | null>>>([]);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
         if (latexExpression.length > 0 && window.MathJax) {
@@ -48,7 +56,7 @@ export default function Home() {
             setLatexExpression([]);
             setResult(undefined);
             setDictOfVars({});
-            latexRefs.current = []; // ✅ reset refs
+            latexRefs.current = [];
             setReset(false);
         }
     }, [reset]);
@@ -57,7 +65,7 @@ export default function Home() {
         const canvas = canvasRef.current;
 
         if (canvas) {
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             if (ctx) {
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight - canvas.offsetTop;
@@ -85,14 +93,13 @@ export default function Home() {
     const renderLatexToCanvas = (expression: string, answer: string) => {
         const latex = `\\(\\LARGE{${expression} = ${answer}}\\)`;
         setLatexExpression((prev) => {
-            // Create and store a new ref
-            latexRefs.current.push(React.createRef()); // This returns a RefObject<HTMLDivElement | null>
+            latexRefs.current.push(React.createRef());
             return [...prev, latex];
         });
 
         const canvas = canvasRef.current;
         if (canvas) {
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             if (ctx) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
@@ -102,7 +109,7 @@ export default function Home() {
     const resetCanvas = () => {
         const canvas = canvasRef.current;
         if (canvas) {
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             if (ctx) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
@@ -139,54 +146,66 @@ export default function Home() {
     const stopDrawing = () => setIsDrawing(false);
 
     const runRoute = async () => {
+        setIsLoading(true);
+        const loadingToastId = toast.loading('Calculating...');
+
         const canvas = canvasRef.current;
 
         if (canvas) {
-            const response = await axios.post(`${import.meta.env.VITE_API_URL}/calculate`, {
-                image: canvas.toDataURL('image/png'),
-                dict_of_vars: dictOfVars,
-            });
+            try {
+                const response = await axios.post(`${import.meta.env.VITE_API_URL}/calculate`, {
+                    image: canvas.toDataURL('image/png'),
+                    dict_of_vars: dictOfVars,
+                });
 
-            const resp = response.data;
-            console.log('Response', resp);
+                const resp = response.data;
+                console.log('Response', resp);
 
-            resp.data.forEach((data: Response) => {
-                if (data.assign === true) {
-                    setDictOfVars((prev) => ({
-                        ...prev,
-                        [data.expr]: data.result,
-                    }));
-                }
-            });
+                resp.data.forEach((data: Response) => {
+                    if (data.assign === true) {
+                        setDictOfVars((prev) => ({
+                            ...prev,
+                            [data.expr]: data.result,
+                        }));
+                    }
+                });
 
-            const ctx = canvas.getContext('2d');
-            const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
-            let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
+                let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
 
-            for (let y = 0; y < canvas.height; y++) {
-                for (let x = 0; x < canvas.width; x++) {
-                    const i = (y * canvas.width + x) * 4;
-                    if (imageData.data[i + 3] > 0) {
-                        minX = Math.min(minX, x);
-                        minY = Math.min(minY, y);
-                        maxX = Math.max(maxX, x);
-                        maxY = Math.max(maxY, y);
+                for (let y = 0; y < canvas.height; y++) {
+                    for (let x = 0; x < canvas.width; x++) {
+                        const i = (y * canvas.width + x) * 4;
+                        if (imageData.data[i + 3] > 0) {
+                            minX = Math.min(minX, x);
+                            minY = Math.min(minY, y);
+                            maxX = Math.max(maxX, x);
+                            maxY = Math.max(maxY, y);
+                        }
                     }
                 }
+
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+                setLatexPosition({ x: centerX, y: centerY });
+
+                resp.data.forEach((data: Response) => {
+                    setTimeout(() => {
+                        setResult({
+                            expression: data.expr,
+                            answer: data.result,
+                        });
+                    }, 1000);
+                });
+
+                toast.success('Calculation successful!', { id: loadingToastId });
+            } catch (error) {
+                console.error(error);
+                toast.error('Calculation failed. Please check the backend connection.', { id: loadingToastId });
+            } finally {
+                setIsLoading(false);
             }
-
-            const centerX = (minX + maxX) / 2;
-            const centerY = (minY + maxY) / 2;
-            setLatexPosition({ x: centerX, y: centerY });
-
-            resp.data.forEach((data: Response) => {
-                setTimeout(() => {
-                    setResult({
-                        expression: data.expr,
-                        answer: data.result,
-                    });
-                }, 1000);
-            });
         }
     };
 
@@ -198,6 +217,7 @@ export default function Home() {
                     className='z-20 bg-white text-black'
                     variant='outline'
                     color='black'
+                    disabled={isLoading}
                 >
                     Reset
                 </Button>
@@ -211,8 +231,9 @@ export default function Home() {
                     className='z-20 bg-white text-black'
                     variant='outline'
                     color='white'
+                    disabled={isLoading}
                 >
-                    Run
+                    {isLoading ? 'Running...' : 'Run'}
                 </Button>
             </div>
 
@@ -242,7 +263,6 @@ export default function Home() {
                 </Draggable>
             ))}
 
-
             {/* Footer */}
             <div
                 style={{
@@ -250,7 +270,7 @@ export default function Home() {
                     bottom: '10px',
                     left: '50%',
                     transform: 'translateX(-50%)',
-                    zIndex: 20, // Make sure it's above the canvas and other elements
+                    zIndex: 20,
                     color: 'white',
                     fontSize: '14px',
                 }}
