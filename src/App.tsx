@@ -22,7 +22,6 @@ const App = () => {
   return (
     <MantineProvider>
       <RouterProvider router={BrowserRouter} />
-      <Footer />
     </MantineProvider>
   )
 }
