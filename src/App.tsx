@@ -5,7 +5,6 @@ import { MantineProvider } from "@mantine/core";
 import Home  from "./screens/home";
 
 import './index.css'
-import Footer from "./components/Footer";
 
 const paths = [
   {
