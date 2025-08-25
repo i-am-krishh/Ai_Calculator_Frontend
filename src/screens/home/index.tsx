@@ -26,7 +26,7 @@ export default function Home() {
     const [result, setResult] = useState<GeneratedResult>();
     const [latexPosition, setLatexPosition] = useState({ x: 10, y: 200 });
     const [latexExpression, setLatexExpression] = useState<Array<string>>([]);
-    const latexRefs = useRef<Array<React.RefObject<HTMLDivElement>>>([]); // ✅ ref array
+    const latexRefs = useRef<Array<React.RefObject<HTMLDivElement | null>>>([]); // ✅ ref array
 
     useEffect(() => {
         if (latexExpression.length > 0 && window.MathJax) {
@@ -86,7 +86,7 @@ export default function Home() {
         const latex = `\\(\\LARGE{${expression} = ${answer}}\\)`;
         setLatexExpression((prev) => {
             // Create and store a new ref
-            latexRefs.current.push(React.createRef());
+            latexRefs.current.push(React.createRef()); // This returns a RefObject<HTMLDivElement | null>
             return [...prev, latex];
         });
 
@@ -229,7 +229,7 @@ export default function Home() {
             {latexExpression.map((latex, index) => (
                 <Draggable
                     key={index}
-                    nodeRef={latexRefs.current[index]}
+                    nodeRef={latexRefs.current[index] as React.RefObject<HTMLDivElement>}
                     defaultPosition={latexPosition}
                     onStop={(_e, data) => setLatexPosition({ x: data.x, y: data.y })}
                 >
